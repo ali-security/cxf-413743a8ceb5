@@ -135,6 +135,48 @@ public class FormattedServiceListWriterTest extends Assert {
         assertTrue(s, s.contains("<a href=\"" + BASE + "/resources?_wadl\">" + BASE + "/resources?_wadl</a>"));
     }
 
+    @Test
+    public void testWriteServiceList() throws Exception {
+        String styleSheetPath = "/app/services/?stylesheet=1";
+        FormattedServiceListWriter writer =
+                new FormattedServiceListWriter(styleSheetPath,
+                        "CXF services", false, null);
+
+        StringWriter sw = new StringWriter();
+        writer.writeServiceList(new PrintWriter(sw), "/path", new AbstractDestination[0], new AbstractDestination[0]);
+
+        assertTrue(sw.toString().contains("href=\"" + styleSheetPath + "\""));
+    }
+
+    @Test
+    public void testStripMultipleForwardSlashes() throws Exception {
+        String styleSheetPath = "////app/services/?stylesheet=1";
+        FormattedServiceListWriter writer =
+                new FormattedServiceListWriter(styleSheetPath,
+                        "CXF services", false, null);
+
+        StringWriter sw = new StringWriter();
+        writer.writeServiceList(new PrintWriter(sw), "/path", new AbstractDestination[0], new AbstractDestination[0]);
+
+        String desiredStyleSheetPath = "/app/services/?stylesheet=1";
+        assertTrue(sw.toString().contains("href=\"" + desiredStyleSheetPath + "\""));
+    }
+
+    @Test
+    public void testStyleSheetPathEscaped() throws Exception {
+        String styleSheetPath = "/app/services/\"><script>alert(1)</script>/?stylesheet=1";
+        FormattedServiceListWriter writer =
+                new FormattedServiceListWriter(styleSheetPath,
+                        "CXF services", false, null);
+
+        StringWriter sw = new StringWriter();
+        writer.writeServiceList(new PrintWriter(sw), "/path", new AbstractDestination[0], new AbstractDestination[0]);
+
+        String s = sw.toString();
+        assertFalse(s, s.contains("<script>"));
+        assertTrue(s, s.contains("href=\"/app/services/&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;/?stylesheet=1\""));
+    }
+
     private static class TestDestination extends AbstractDestination {
         private static final Logger LOG = Logger.getLogger(TestDestination.class.getName());
 
