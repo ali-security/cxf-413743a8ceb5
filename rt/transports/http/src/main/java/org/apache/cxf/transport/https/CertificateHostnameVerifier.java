@@ -183,6 +183,10 @@ public interface CertificateHostnameVerifier extends javax.net.ssl.HostnameVerif
                 // Allow everything - so never blowup.
             }
 
+            public final boolean verify(final String host, final String certHostname) {
+                return certHostname != null && !certHostname.isEmpty();
+            }
+
             public final String toString() {
                 return "ALLOW_ALL";
             }
@@ -266,6 +270,15 @@ public interface CertificateHostnameVerifier extends javax.net.ssl.HostnameVerif
                 check(new String[]{host}, x509);
                 return true;
             } catch (SSLException e) {
+                return false;
+            }
+        }
+
+        public boolean verify(final String host, final String certHostname) {
+            try {
+                check(host, new String[] {certHostname}, null);
+                return true;
+            } catch (SSLException ex) {
                 return false;
             }
         }
