@@ -112,4 +112,36 @@ public class BaseUrlHelperTest {
         Assert.assertEquals("http://localhost:8080/services", url);
 
     }
+
+    @Test
+    public void testGetRequestURLServletPatternMatchOnly() throws Exception {
+        String url = testGetBaseURL("http://localhost:8080/the/", "", "/the", "/");
+        Assert.assertEquals("http://localhost:8080/the/", url);
+    }
+
+    @Test
+    public void testGetRequestURLServletPatternMatchOnlyWithMatrixParam() throws Exception {
+        String url = testGetBaseURL("http://localhost:8080/the/;a=b", "", "/the", "/");
+        Assert.assertEquals("http://localhost:8080/the", url);
+    }
+
+    @Test
+    public void testGetRequestURLServletPatternMatchOnlyWithMatrixParams() throws Exception {
+        String url = testGetBaseURL("http://localhost:8080/services;a=b;/list;a=b/;a=b",
+                                    "", "/services/list", "/");
+        Assert.assertEquals("http://localhost:8080/services/list", url);
+    }
+
+    @Test
+    public void testGetRequestURLServletPatternMatchOnlyWithInjectedMatrixParam() throws Exception {
+        String url = testGetBaseURL("http://localhost:8080/the/;a=%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E",
+                                    "", "/the", "/");
+        Assert.assertEquals("http://localhost:8080/the", url);
+    }
+
+    @Test
+    public void testGetRequestURLNullContextAndServletPath() throws Exception {
+        String url = testGetBaseURL("http://localhost:8080/services/bar", null, null, "/services/bar");
+        Assert.assertEquals("http://localhost:8080", url);
+    }
 }
