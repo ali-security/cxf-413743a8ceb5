@@ -138,6 +138,8 @@ public class JAXRSClientServerSpringBookTest extends AbstractBusClientServerTest
         assertTrue(s.contains("<a href=\"http://localhost:" + PORT + "/the/"));
     }
     @Test
+    @Ignore("Jetty 8.1 truncates the request path at the first ';', so /services;a=b;/list "
+            + "never reaches the /services/list/* servlet (404); requires Jetty 9 path-param handling")
     public void testGetServicesPageWithServletPatternMatchOnly2() throws Exception {
         final String address = "http://localhost:" + PORT + "/services;a=b;/list;a=b/;a=b";
         WebClient wc = WebClient.create(address).accept("text/*");

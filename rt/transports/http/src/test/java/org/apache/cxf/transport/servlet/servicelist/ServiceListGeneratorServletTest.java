@@ -27,9 +27,12 @@ import java.util.logging.Logger;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
+import javax.xml.namespace.QName;
 
 import org.apache.cxf.message.Message;
 import org.apache.cxf.service.model.EndpointInfo;
+import org.apache.cxf.service.model.InterfaceInfo;
+import org.apache.cxf.service.model.ServiceInfo;
 import org.apache.cxf.transport.AbstractDestination;
 import org.apache.cxf.transport.Conduit;
 import org.apache.cxf.transport.http.DestinationRegistry;
@@ -46,16 +49,34 @@ import org.junit.Test;
  */
 public class ServiceListGeneratorServletTest extends Assert {
     private static final String HOST = "http://localhost:8080";
+    private static final String NS = "http://cxf.apache.org/greeter_control";
 
     private static String getServicesPage(String requestUri, String contextPath,
                                           String servletPath, String pathInfo) throws Exception {
+        return getServicesPage(requestUri, contextPath, servletPath, pathInfo,
+                               new HashMap<String, String>());
+    }
+
+    private static String getServicesPage(String requestUri, String contextPath,
+                                          String servletPath, String pathInfo,
+                                          Map<String, String> parameters) throws Exception {
         EndpointInfo ei = new EndpointInfo();
         ei.setAddress("/bookstore");
         AbstractDestination dest = new TestDestination(ei);
 
+        ServiceInfo si = new ServiceInfo();
+        si.setName(new QName(NS, "BasicGreeterService"));
+        si.setTargetNamespace(NS);
+        InterfaceInfo ii = new InterfaceInfo(si, new QName(NS, "Greeter"));
+        ii.addOperation(new QName(NS, "greetMe"));
+        EndpointInfo soapEi = new EndpointInfo(si, "http://schemas.xmlsoap.org/wsdl/soap/");
+        soapEi.setName(new QName(NS, "GreeterPort"));
+        soapEi.setAddress("/SoapContext/GreeterPort");
+        AbstractDestination soapDest = new TestDestination(soapEi);
+
         DestinationRegistry registry = EasyMock.createNiceMock(DestinationRegistry.class);
         registry.getSortedDestinations();
-        EasyMock.expectLastCall().andReturn(new AbstractDestination[] {dest}).anyTimes();
+        EasyMock.expectLastCall().andReturn(new AbstractDestination[] {dest, soapDest}).anyTimes();
 
         StringWriter out = new StringWriter();
         HttpServletResponse res = EasyMock.createNiceMock(HttpServletResponse.class);
@@ -66,7 +87,7 @@ public class ServiceListGeneratorServletTest extends Assert {
 
         ServiceListGeneratorServlet serviceListGenerator = new ServiceListGeneratorServlet(registry, null);
         ServletController controller = new ServletController(registry, null, serviceListGenerator);
-        controller.invoke(new TestRequest(requestUri, contextPath, servletPath, pathInfo), res);
+        controller.invoke(new TestRequest(requestUri, contextPath, servletPath, pathInfo, parameters), res);
         return out.toString();
     }
 
@@ -134,19 +155,62 @@ public class ServiceListGeneratorServletTest extends Assert {
         assertFalse(s, s.contains("/the//bookstore"));
     }
 
+    @Test
+    public void testServiceListing() throws Exception {
+        String s = getServicesPage("/service_listing/services", "/service_listing", "/services", null);
+        assertTrue(s, s.contains(HOST + "/service_listing/services/bookstore"));
+        assertTrue(s, s.contains(HOST + "/service_listing/services/SoapContext/GreeterPort"));
+    }
+
+    @Test
+    public void testServiceListingUnformatted() throws Exception {
+        Map<String, String> params = new HashMap<String, String>();
+        params.put("formatted", "false");
+        String s = getServicesPage("/service_listing/services", "/service_listing", "/services", null, params);
+        assertFalse(s, s.contains("<title>CXF - Service list</title>"));
+        assertTrue(s, s.contains(HOST + "/service_listing/services/bookstore"));
+        assertTrue(s, s.contains(HOST + "/service_listing/services/SoapContext/GreeterPort"));
+    }
+
+    @Test
+    public void testEscapeHTML() throws Exception {
+        String s = getServicesPage("/service_listing/services/<script>alert(1)</script>/../../",
+                                   "/service_listing", "/services", "/");
+        assertTrue(s, s.contains("<title>CXF - Service list</title>"));
+        assertFalse(s, s.contains("<script>"));
+        String escapedBase = HOST + "/service_listing/services/&lt;script&gt;alert(1)&lt;/script&gt;/../..";
+        assertTrue(s, s.contains("<a href=\"" + escapedBase + "/bookstore?_wadl\""));
+        assertTrue(s, s.contains("<a href=\"" + escapedBase + "/SoapContext/GreeterPort?wsdl\""));
+    }
+
+    @Test
+    public void testEscapeHTMLUnformatted() throws Exception {
+        Map<String, String> params = new HashMap<String, String>();
+        params.put("formatted", "false");
+        String s = getServicesPage("/service_listing/services/<script>alert(1)</script>/../../",
+                                   "/service_listing", "/services", "/", params);
+        assertFalse(s, s.contains("<script>"));
+        String escapedBase = HOST + "/service_listing/services/&lt;script&gt;alert(1)&lt;/script&gt;/../../";
+        assertTrue(s, s.contains(escapedBase + "/bookstore?_wadl"));
+        assertTrue(s, s.contains(escapedBase + "/SoapContext/GreeterPort"));
+    }
+
     private static class TestRequest extends HttpServletRequestWrapper {
         private final String requestUri;
         private final String contextPath;
         private final String servletPath;
         private final String pathInfo;
+        private final Map<String, String> parameters;
         private final Map<String, Object> attributes = new HashMap<String, Object>();
 
-        TestRequest(String requestUri, String contextPath, String servletPath, String pathInfo) {
+        TestRequest(String requestUri, String contextPath, String servletPath, String pathInfo,
+                    Map<String, String> parameters) {
             super(createDelegate());
             this.requestUri = requestUri;
             this.contextPath = contextPath;
             this.servletPath = servletPath;
             this.pathInfo = pathInfo;
+            this.parameters = parameters;
         }
 
         private static HttpServletRequest createDelegate() {
@@ -182,7 +246,7 @@ public class ServiceListGeneratorServletTest extends Assert {
 
         @Override
         public String getParameter(String name) {
-            return null;
+            return parameters.get(name);
         }
 
         @Override
